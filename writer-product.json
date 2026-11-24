@@ -1,0 +1,17 @@
+{
+  "nameShort": "VSwriter",
+  "nameLong": "VSwriter",
+  "applicationName": "vswriter",
+  "dataFolderName": ".vswriter",
+  "urlProtocol": "vswriter",
+  "darwinBundleIdentifier": "local.vswriter",
+  "linuxIconName": "writer-ide",
+  "serverApplicationName": "writer-server",
+  "serverDataFolderName": ".writer-ide-server",
+  "tunnelApplicationName": "writer-tunnel",
+  "reportIssueUrl": "https://github.com/wenbilly31-source/writer-ide/issues/new",
+  "licenseUrl": "https://github.com/wenbilly31-source/writer-ide/blob/master/LICENSE",
+  "builtInExtensions": [],
+  "updateUrl": null,
+  "downloadUrl": null
+}

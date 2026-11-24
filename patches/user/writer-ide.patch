@@ -1,0 +1,293 @@
+diff --git a/build/lib/extensions.ts b/build/lib/extensions.ts
+index 6b86f292..18423e5e 100644
+--- a/build/lib/extensions.ts
++++ b/build/lib/extensions.ts
+@@ -315,6 +315,72 @@ const nativeExtensions = [
+ 
+ const excludedExtensions = [
+ 	'copilot',
++	// writer-ide: coding languages and tools
++	'bat',
++	'clojure',
++	'coffeescript',
++	'cpp',
++	'csharp',
++	'css',
++	'css-language-features',
++	'dart',
++	'debug-auto-launch',
++	'debug-server-ready',
++	'diff',
++	'docker',
++	'dotenv',
++	'emmet',
++	'extension-editing',
++	'fsharp',
++	'git',
++	'git-base',
++	'github',
++	'github-authentication',
++	'go',
++	'groovy',
++	'grunt',
++	'gulp',
++	'handlebars',
++	'hlsl',
++	'html',
++	'html-language-features',
++	'ini',
++	'ipynb',
++	'jake',
++	'java',
++	'javascript',
++	'julia',
++	'less',
++	'lua',
++	'make',
++	'merge-conflict',
++	'microsoft-authentication',
++	'notebook-renderers',
++	'npm',
++	'objective-c',
++	'perl',
++	'php',
++	'php-language-features',
++	'powershell',
++	'prompt-basics',
++	'pug',
++	'python',
++	'r',
++	'razor',
++	'references-view',
++	'restructuredtext',
++	'ruby',
++	'rust',
++	'scss',
++	'shaderlab',
++	'shellscript',
++	'sql',
++	'swift',
++	'tunnel-forwarding',
++	'typescript-basics',
++	'typescript-language-features',
++	'vb',
++	'xml',
+ 	'vscode-api-tests',
+ 	'vscode-colorize-tests',
+ 	'vscode-colorize-perf-tests',
+@@ -621,13 +687,11 @@ export async function esbuildExtensions(taskName: string, isWatch: boolean, scri
+ 
+ // Additional projects to run esbuild on. These typically build code for webviews
+ const esbuildMediaScripts: { script: string; tsconfig: string }[] = [
+-	{ script: 'ipynb/esbuild.notebook.mts', tsconfig: 'ipynb/notebook-src/tsconfig.json' },
+ 	{ script: 'markdown-language-features/esbuild.notebook.mts', tsconfig: 'markdown-language-features/notebook/tsconfig.json' },
+ 	{ script: 'markdown-language-features/esbuild.webview.mts', tsconfig: 'markdown-language-features/preview-src/tsconfig.json' },
+ 	{ script: 'markdown-language-features/esbuild.markdownEditor.mts', tsconfig: 'markdown-language-features/markdown-editor-src/tsconfig.json' },
+ 	{ script: 'markdown-math/esbuild.notebook.mts', tsconfig: 'markdown-math/notebook/tsconfig.json' },
+ 	{ script: 'mermaid-markdown-features/esbuild.webview.mts', tsconfig: 'mermaid-markdown-features/preview-src/tsconfig.json' },
+-	{ script: 'notebook-renderers/esbuild.notebook.mts', tsconfig: 'notebook-renderers/tsconfig.json' },
+ 	{ script: 'simple-browser/esbuild.webview.mts', tsconfig: 'simple-browser/preview-src/tsconfig.json' },
+ ];
+ 
+diff --git a/src/vs/workbench/contrib/writer/browser/writer.contribution.ts b/src/vs/workbench/contrib/writer/browser/writer.contribution.ts
+new file mode 100644
+index 00000000..4b9dcab1
+--- /dev/null
++++ b/src/vs/workbench/contrib/writer/browser/writer.contribution.ts
+@@ -0,0 +1,59 @@
++/*---------------------------------------------------------------------------------------------
++ *  Writer-first defaults for writer-ide.
++ *  Kept in one new file so upstream VS Code rebases never conflict with it.
++ *--------------------------------------------------------------------------------------------*/
++
++import { IConfigurationRegistry, Extensions } from '../../../../platform/configuration/common/configurationRegistry.js';
++import { Registry } from '../../../../platform/registry/common/platform.js';
++
++const proseEditor = {
++	'editor.wordWrap': 'on',
++	'editor.lineNumbers': 'off',
++	'editor.glyphMargin': false,
++	'editor.folding': false,
++	'editor.minimap.enabled': false,
++	'editor.renderLineHighlight': 'none',
++	'editor.guides.indentation': false,
++	'editor.occurrencesHighlight': 'off',
++	'editor.selectionHighlight': false,
++	'editor.unicodeHighlight.ambiguousCharacters': false,
++	'editor.quickSuggestions': { other: 'off', comments: 'off', strings: 'off' },
++	'editor.wordBasedSuggestions': 'off',
++	'editor.suggestOnTriggerCharacters': false,
++	'editor.fontFamily': '"Iowan Old Style", Charter, Georgia, serif',
++	'editor.fontSize': 17,
++	'editor.lineHeight': 1.7,
++	'editor.padding.top': 32,
++	'editor.cursorBlinking': 'smooth',
++	'editor.cursorSmoothCaretAnimation': 'on',
++};
++
++Registry.as<IConfigurationRegistry>(Extensions.Configuration).registerDefaultConfigurations([{
++	source: { id: 'writer-ide', displayName: 'Writer defaults' },
++	overrides: {
++		// Prose is the default document type.
++		'files.defaultLanguage': 'markdown',
++		'files.autoSave': 'afterDelay',
++		'[markdown]': proseEditor,
++		'[plaintext]': proseEditor,
++
++		// Quiet chrome around the page.
++		'editor.minimap.enabled': false,
++		'editor.stickyScroll.enabled': false,
++		'breadcrumbs.enabled': false,
++		'workbench.editor.empty.hint': 'hidden',
++		'workbench.tips.enabled': false,
++		'workbench.startupEditor': 'none',
++		'extensions.ignoreRecommendations': true,
++
++		// The built-in coding agent stays off; our own writing assistance replaces it.
++		// The integrated terminal stays available (Claude Code etc.).
++		'chat.disableAIFeatures': true,
++
++		// Writers open folders of readings and drafts, not code to audit: no
++		// Restricted Mode, no trust prompt, and the terminal always starts.
++		'security.workspace.trust.enabled': false,
++		// The right side bar would only hold an empty chat view.
++		'workbench.secondarySideBar.defaultVisibility': 'hidden',
++	}
++}]);
+diff --git a/src/vs/workbench/workbench.common.main.ts b/src/vs/workbench/workbench.common.main.ts
+index 199aca70..7ad5986f 100644
+--- a/src/vs/workbench/workbench.common.main.ts
++++ b/src/vs/workbench/workbench.common.main.ts
+@@ -244,7 +244,6 @@ import './contrib/imageCarousel/browser/imageCarousel.contribution.js';
+ import './contrib/interactive/browser/interactive.contribution.js';
+ 
+ // repl
+-import './contrib/replNotebook/browser/repl.contribution.js';
+ 
+ // Testing
+ import './contrib/testing/browser/testing.contribution.js';
+@@ -279,20 +278,13 @@ import './contrib/sash/browser/sash.contribution.js';
+ 
+ // Git
+ import './contrib/git/browser/git.contributions.js';
+-import './contrib/github/browser/githubLinkPresentation.contribution.js';
+ 
+ // SCM
+-import './contrib/scm/browser/scm.contribution.js';
+ import './contrib/scm/browser/quickDiff.contribution.js';
+ import './contrib/scm/browser/scm.service.contribution.js';
+ 
+ // Debug
+-import './contrib/debug/browser/debug.contribution.js';
+-import './contrib/debug/browser/debugEditorContribution.js';
+-import './contrib/debug/browser/breakpointEditorContribution.js';
+-import './contrib/debug/browser/callStackEditorContribution.js';
+-import './contrib/debug/browser/repl.js';
+-import './contrib/debug/browser/debugViewlet.js';
++import './contrib/debug/browser/debug.service.contribution.js';
+ 
+ // Markers
+ import './contrib/markers/browser/markers.contribution.js';
+@@ -301,7 +293,6 @@ import './contrib/markers/browser/markers.contribution.js';
+ import './contrib/processExplorer/browser/processExplorer.contribution.js';
+ 
+ // Merge Editor
+-import './contrib/mergeEditor/browser/mergeEditor.contribution.js';
+ 
+ // Multi Diff Editor
+ import './contrib/multiDiffEditor/browser/multiDiffEditor.contribution.js';
+@@ -345,14 +336,11 @@ import './contrib/relauncher/browser/relauncher.contribution.js';
+ import './contrib/modernUI/browser/modernUI.contribution.js';
+ 
+ // Tasks
+-import './contrib/tasks/browser/task.contribution.js';
+ 
+ // Remote
+ import './contrib/remote/common/remote.contribution.js';
+-import './contrib/remote/browser/remote.contribution.js';
+ 
+ // Emmet
+-import './contrib/emmet/browser/emmet.contribution.js';
+ 
+ // CodeEditor Contributions
+ import './contrib/codeEditor/browser/codeEditor.contribution.js';
+@@ -385,26 +373,19 @@ import './contrib/themes/browser/themes.contribution.js';
+ import './contrib/update/browser/update.contribution.js';
+ 
+ // Surveys
+-import './contrib/surveys/browser/nps.contribution.js';
+-import './contrib/surveys/browser/languageSurveys.contribution.js';
+ 
+ // Welcome
+ import './contrib/welcomeGettingStarted/browser/gettingStarted.contribution.js';
+-import './contrib/welcomeAgentSessions/browser/agentSessionsWelcome.contribution.js';
+-import './contrib/welcomeWalkthrough/browser/walkThrough.contribution.js';
+ import './contrib/welcomeViews/common/viewsWelcome.contribution.js';
+ import './contrib/welcomeViews/common/newFile.contribution.js';
+ 
+ // Onboarding (scenario engine)
+ import './contrib/onboarding/browser/onboarding.contribution.js';
+ import './contrib/chat/browser/onboarding/modelPickerTryout.contribution.js';
+-import './contrib/codeEditor/browser/diffEditorTryout.contribution.js';
+ 
+ // Call Hierarchy
+-import './contrib/callHierarchy/browser/callHierarchy.contribution.js';
+ 
+ // Type Hierarchy
+-import './contrib/typeHierarchy/browser/typeHierarchy.contribution.js';
+ 
+ // Outline
+ import './contrib/codeEditor/browser/outline/documentSymbolsOutline.js';
+@@ -426,10 +407,8 @@ import './contrib/userDataSync/browser/userDataSync.contribution.js';
+ import './contrib/userDataProfile/browser/userDataProfile.contribution.js';
+ 
+ // Continue Edit Session
+-import './contrib/editSessions/browser/editSessions.contribution.js';
+ 
+ // Remote Coding Agents
+-import './contrib/remoteCodingAgents/browser/remoteCodingAgents.contribution.js';
+ 
+ // Code Actions
+ import './contrib/codeActions/browser/codeActions.contribution.js';
+@@ -454,7 +433,6 @@ import './contrib/list/browser/list.contribution.js';
+ import './contrib/accessibilitySignals/browser/accessibilitySignal.contribution.js';
+ 
+ // Bracket Pair Colorizer 2 Telemetry
+-import './contrib/bracketPairColorizer2Telemetry/browser/bracketPairColorizer2Telemetry.contribution.js';
+ 
+ // Accessibility
+ import './contrib/accessibility/browser/accessibility.contribution.js';
+@@ -480,4 +458,7 @@ import './contrib/editTelemetry/browser/editTelemetry.contribution.js';
+ // Opener
+ import './contrib/opener/browser/opener.contribution.js';
+ 
++// Writer
++import './contrib/writer/browser/writer.contribution.js';
++
+ //#endregion
+diff --git a/src/vs/workbench/workbench.desktop.main.ts b/src/vs/workbench/workbench.desktop.main.ts
+index 5278709d..901b03f4 100644
+--- a/src/vs/workbench/workbench.desktop.main.ts
++++ b/src/vs/workbench/workbench.desktop.main.ts
+@@ -142,7 +142,6 @@ import './contrib/extensions/electron-browser/devtoolsExtensionHost.contribution
+ import './contrib/issue/electron-browser/issue.contribution.js';
+ 
+ // Surveys
+-import './contrib/surveys/browser/survey.contribution.js';
+ 
+ // Process Explorer
+ import './contrib/processExplorer/electron-browser/processExplorer.contribution.js';
+@@ -185,13 +184,11 @@ import './contrib/splash/electron-browser/splash.contribution.js';
+ import './contrib/localHistory/electron-browser/localHistory.contribution.js';
+ 
+ // Merge Editor
+-import './contrib/mergeEditor/electron-browser/mergeEditor.contribution.js';
+ 
+ // Multi Diff Editor
+ import './contrib/multiDiffEditor/browser/multiDiffEditor.contribution.js';
+ 
+ // Remote Tunnel
+-import './contrib/remoteTunnel/electron-browser/remoteTunnel.contribution.js';
+ 
+ // Chat
+ import './contrib/chat/electron-browser/chat.contribution.js';

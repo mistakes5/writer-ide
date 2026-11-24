@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{CSP_SOURCE}}; script-src 'nonce-{{NONCE}}'; img-src {{CSP_SOURCE}}; font-src {{CSP_SOURCE}};">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>VSwriter</title>
+	<link rel="stylesheet" href="{{CSS_URI}}">
+</head>
+<body>
+
+	<!-- Everything a writer opens beside the draft, one click away. -->
+	<nav class="launch" aria-label="Open beside the draft">
+		<button class="launch-btn" type="button" data-launch="pdf" title="Open a PDF beside the draft (or drag one onto the editor)">PDF</button>
+		<button class="launch-btn" type="button" data-launch="browser" title="Open a web page beside the draft">Browser</button>
+		<button class="launch-btn" type="button" data-launch="capture" title="Save the open web page into sources/">Capture</button>
+		<button class="launch-btn" type="button" data-launch="terminal" title="Open a terminal on the right">Terminal</button>
+		<button class="launch-btn" type="button" data-launch="claude" title="Open Claude Code in a terminal on the right">Claude</button>
+	</nav>
+
+	<nav class="tabs" role="tablist" aria-label="VSwriter">
+		<button class="tab" role="tab" id="tab-interview" data-tab="interview" aria-controls="panel-interview" aria-selected="true" tabindex="0">Assistant</button>
+		<button class="tab" role="tab" id="tab-outline" data-tab="outline" aria-controls="panel-outline" aria-selected="false" tabindex="-1">Outline<span class="tab-count" id="count-outline"></span></button>
+		<button class="tab" role="tab" id="tab-bookmarks" data-tab="bookmarks" aria-controls="panel-bookmarks" aria-selected="false" tabindex="-1">Bookmarks<span class="tab-count" id="count-bookmarks"></span></button>
+		<button class="tab" role="tab" id="tab-lint" data-tab="lint" aria-controls="panel-lint" aria-selected="false" tabindex="-1" title="Coax &amp; Lint"><span class="tab-wide">Coax &amp; </span>Lint<span class="tab-count" id="count-lint"></span></button>
+	</nav>
+
+	<main id="main">
+
+		<!-- Shown on every tab until the three workflow files exist. -->
+		<section class="setup" id="setup" aria-labelledby="setup-title" hidden>
+			<h2 class="voice" id="setup-title">Start the workflow files for this piece</h2>
+			<p class="note">VSwriter keeps the interview in three plain Markdown files in your workspace folder. You can open and read them like any other file.</p>
+			<dl class="files">
+				<dt>raw-answers.md</dt>
+				<dd>Your answers, exactly as typed. Each save adds to the end.</dd>
+				<dt>interview-state.md</dt>
+				<dd>The question you are on and what has been covered.</dd>
+				<dt>source-map.md</dt>
+				<dd>Which reading passages go with which answers.</dd>
+			</dl>
+			<button class="btn btn-primary" id="init-workspace" type="button">Create the three files</button>
+		</section>
+
+		<!-- Interview -->
+		<section class="panel" id="panel-interview" role="tabpanel" aria-labelledby="tab-interview" tabindex="-1">
+			<div class="chat" id="chat">
+				<div class="chat-tools">
+					<button class="launch-btn" type="button" id="mind-map" title="Build a mind map of your essay from the interview">Mind map</button>
+				</div>
+				<details class="brief" id="brief" hidden>
+					<summary>Brief</summary>
+					<ul id="brief-list"></ul>
+				</details>
+				<ol class="chat-log" id="chat-log" aria-live="polite"></ol>
+				<p class="chat-error" id="chat-error" role="alert" hidden></p>
+				<form class="composer" id="composer">
+					<label class="visually-hidden" for="chat-input">Message</label>
+					<textarea class="prose" id="chat-input" rows="3" spellcheck="true" placeholder="Reply in your own words. Rough is fine."></textarea>
+					<button class="btn btn-primary" id="chat-send" type="submit">Send</button>
+				</form>
+			</div>
+			<div id="interview-body" hidden>
+				<h2 class="visually-hidden">Current question</h2>
+				<p class="voice question" id="question"></p>
+
+				<!-- Sentence openers for the current question. A click puts one in the answer field. -->
+				<div class="stances" id="stances" role="group" aria-labelledby="stances-label" hidden>
+					<p class="note" id="stances-label">Start from a stance:</p>
+					<div class="stance-list" id="stance-list"></div>
+				</div>
+
+				<!-- One or two reading passages for the current question, so the writer can answer without leaving this tab. -->
+				<section class="context" id="context" aria-labelledby="context-title" hidden>
+					<h3 id="context-title">Reading context</h3>
+					<ol id="context-list"></ol>
+				</section>
+
+				<label class="visually-hidden" for="answer">Your answer</label>
+				<textarea class="prose answer-input" id="answer" rows="7" spellcheck="true" placeholder="Answer in your own words. Rough is fine."></textarea>
+				<p class="note" id="draft-note" hidden></p>
+
+				<div class="actions">
+					<button class="btn btn-primary" id="save-answer" type="button">Save answer</button>
+					<button class="btn" id="next-question" type="button">Next question</button>
+				</div>
+				<div class="under">
+					<p class="note" id="answer-status" role="status" aria-live="polite"></p>
+					<span class="hint"><kbd id="save-key">Cmd+Enter</kbd> saves</span>
+				</div>
+
+				<section class="section" aria-labelledby="answers-title">
+					<div class="section-head">
+						<h2 id="answers-title">Saved answers</h2>
+						<span class="mono tally" id="answers-count"></span>
+					</div>
+					<ol class="rows" id="answers"></ol>
+					<p class="empty" id="answers-empty" hidden>Nothing saved yet. An answer you save is added to raw-answers.md exactly as typed.</p>
+				</section>
+			</div>
+		</section>
+
+		<!-- Outline -->
+		<section class="panel" id="panel-outline" role="tabpanel" aria-labelledby="tab-outline" tabindex="-1" hidden>
+			<section aria-labelledby="outline-title">
+				<div class="section-head">
+					<h2 id="outline-title">Draft outline</h2>
+					<span class="mono tally" id="outline-tally"></span>
+				</div>
+				<ol class="outline-rows" id="outline"></ol>
+				<p class="empty" id="outline-empty" hidden></p>
+			</section>
+
+			<section class="section" id="skeletons-section" aria-labelledby="skeletons-title" hidden>
+				<div class="section-head">
+					<h2 id="skeletons-title">Paragraph skeletons</h2>
+				</div>
+				<p class="note" id="skeletons-note"></p>
+				<ul class="rows" id="skeletons"></ul>
+			</section>
+		</section>
+
+		<!-- Bookmarks -->
+		<section class="panel" id="panel-bookmarks" role="tabpanel" aria-labelledby="tab-bookmarks" tabindex="-1" hidden>
+			<div id="bookmarks-body">
+				<div class="section-head">
+					<h2>Passages that match your answers</h2>
+					<button class="btn-text" id="refresh-bookmarks" type="button">Refresh</button>
+				</div>
+				<ol class="rows" id="bookmarks"></ol>
+				<p class="empty" id="bookmarks-empty" hidden></p>
+			</div>
+		</section>
+
+		<!-- Coax & Lint -->
+		<section class="panel" id="panel-lint" role="tabpanel" aria-labelledby="tab-lint" tabindex="-1" hidden>
+			<section id="coax" aria-labelledby="coax-title">
+				<div class="section-head">
+					<h2 id="coax-title">Cues</h2>
+					<button class="btn-text" id="refresh-coax" type="button">Refresh cues</button>
+				</div>
+				<p class="voice coax-heading" id="coax-heading" hidden></p>
+				<p class="note" id="coax-basis" hidden></p>
+				<ul class="rows" id="starters"></ul>
+				<p class="empty" id="coax-empty" hidden></p>
+				<p class="note" id="coax-note">A cue opens a sentence with your own phrases. You write the rest.</p>
+			</section>
+
+			<section class="section" id="flags" aria-labelledby="flags-title">
+				<div class="section-head">
+					<h2 id="flags-title">Flags</h2>
+					<span class="mono tally" id="flags-file"></span>
+				</div>
+				<div id="diagnostics"></div>
+				<p class="empty" id="flags-empty" hidden></p>
+			</section>
+		</section>
+
+	</main>
+
+	<footer class="status">
+		<span id="status-workspace" role="status" aria-live="polite">Waiting for VSwriter</span>
+		<span class="mono status-file" id="status-file"></span>
+	</footer>
+
+	<script nonce="{{NONCE}}" src="{{JS_URI}}"></script>
+	<script nonce="{{NONCE}}" src="{{CHAT_JS_URI}}"></script>
+</body>
+</html>

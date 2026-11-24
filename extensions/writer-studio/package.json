@@ -1,0 +1,305 @@
+{
+	"name": "writer-studio",
+	"displayName": "VSwriter Studio",
+	"description": "Interview workflow, argument outline, paragraph lenses, reading bookmarks, citation lookup, a prose linter with quick fixes, and a split-screen PDF reader and research browser for VSwriter.",
+	"version": "0.3.0",
+	"publisher": "writer-ide",
+	"license": "MIT",
+	"private": true,
+	"engines": {
+		"vscode": "^1.85.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"main": "./dist/extension.js",
+	"activationEvents": [
+		"onLanguage:markdown",
+		"onCustomEditor:writerStudio.pdfReader"
+	],
+	"contributes": {
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "writer-studio",
+					"title": "VSwriter",
+					"icon": "media/writer-icon.svg"
+				}
+			]
+		},
+		"views": {
+			"writer-studio": [
+				{
+					"type": "webview",
+					"id": "writerStudio.panel",
+					"name": "VSwriter"
+				},
+				{
+					"id": "writerStudio.outline",
+					"name": "Argument Outline",
+					"visibility": "collapsed"
+				}
+			]
+		},
+		"customEditors": [
+			{
+				"viewType": "writerStudio.pdfReader",
+				"displayName": "VSwriter PDF Reader",
+				"selector": [
+					{
+						"filenamePattern": "*.pdf"
+					}
+				],
+				"priority": "default"
+			}
+		],
+		"commands": [
+			{
+				"command": "writerStudio.openPanel",
+				"title": "Open Panel",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.refreshBookmarks",
+				"title": "Refresh Reading Bookmarks",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.runLint",
+				"title": "Lint Current Draft",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.initWorkspace",
+				"title": "Set Up Interview Files",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.openReadingBeside",
+				"title": "Open Reading Beside Draft",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.insertSkeleton",
+				"title": "Insert Paragraph Skeleton",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.jumpToLine",
+				"title": "Go to Paragraph",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.openParagraphReading",
+				"title": "Open Reading Matching This Paragraph",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.openPdfBeside",
+				"title": "Open PDF Beside Draft",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.openBrowserBeside",
+				"title": "Open Research Browser Beside Draft",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.captureWebPage",
+				"title": "Capture Web Page to Sources",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.straighten",
+				"title": "✦ Straighten",
+				"category": "VSwriter",
+				"icon": "$(sparkle)"
+			},
+			{
+				"command": "writerStudio.straighten.accept",
+				"title": "Accept Straighten",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.straighten.deny",
+				"title": "Deny Straighten",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.straighten.reply",
+				"title": "Reply to Straighten",
+				"category": "VSwriter"
+			},
+			{
+				"command": "writerStudio.nudge",
+				"title": "✦ Nudge Me (I'm Stuck)",
+				"category": "VSwriter",
+				"icon": "$(comment-discussion)"
+			},
+			{
+				"command": "writerStudio.nudge.reply",
+				"title": "Reply"
+			},
+			{
+				"command": "writerStudio.nudge.dismiss",
+				"title": "Dismiss",
+				"icon": "$(close)"
+			}
+		],
+		"configuration": {
+			"title": "VSwriter Studio",
+			"properties": {
+				"writerStudio.readingsDirs": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					},
+					"default": [],
+					"markdownDescription": "Folders of course readings (`.md` or `.txt`) to index for bookmarks, citation lookup and quotation checks. `~` expands to the home folder. Workspace files count only inside a `readings`, `sources` or `Knowledge Library` folder."
+				},
+				"writerStudio.enableLiveLint": {
+					"type": "boolean",
+					"default": true,
+					"description": "Lint Markdown drafts as you type."
+				},
+				"writerStudio.enableParagraphLens": {
+					"type": "boolean",
+					"default": true,
+					"description": "Show word, source and quote counts above each paragraph of a Markdown draft, with one next step when something is missing."
+				},
+				"writerStudio.splitScreenDefault": {
+					"type": "boolean",
+					"default": true,
+					"description": "Open the newest PDF in the workspace beside a draft when no reading is open."
+				},
+				"writerStudio.companion.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "After a pause in typing, ask Jev whether the paragraph develops an idea and, if so, find passages in the PDF beside the draft that support or complicate it."
+				},
+				"writerStudio.companion.model": {
+					"type": "string",
+					"default": "claude-sonnet-5-5",
+					"description": "Claude model (via the local claude CLI) that proposes passages. Quotes are verified verbatim before they are shown."
+				},
+				"writerStudio.companion.ideaThreshold": {
+					"type": "number",
+					"default": 0.6,
+					"description": "Jev probability that a paragraph develops an idea before a passage search runs."
+				},
+				"writerStudio.companion.pauseMs": {
+					"type": "number",
+					"default": 2500,
+					"description": "Milliseconds of no typing before the paragraph is checked."
+				},
+				"writerStudio.nudge.stuckSeconds": {
+					"type": "number",
+					"default": 45,
+					"minimum": 0,
+					"description": "Seconds without a change to the paragraph you are on before VSwriter offers a nudge from your interview. 0 turns automatic nudges off; \"Nudge Me\" still works."
+				}
+			}
+		},
+		"themes": [
+			{
+				"label": "VSwriter Paper",
+				"uiTheme": "vs",
+				"path": "./themes/writer-paper.json"
+			},
+			{
+				"label": "VSwriter Ink",
+				"uiTheme": "vs-dark",
+				"path": "./themes/writer-ink.json"
+			}
+		],
+		"menus": {
+			"commandPalette": [
+				{
+					"command": "writerStudio.jumpToLine",
+					"when": "false"
+				},
+				{
+					"command": "writerStudio.straighten.accept",
+					"when": "false"
+				},
+				{
+					"command": "writerStudio.straighten.deny",
+					"when": "false"
+				},
+				{
+					"command": "writerStudio.straighten.reply",
+					"when": "false"
+				},
+				{
+					"command": "writerStudio.nudge.reply",
+					"when": "false"
+				},
+				{
+					"command": "writerStudio.nudge.dismiss",
+					"when": "false"
+				}
+			],
+			"explorer/context": [
+				{
+					"command": "writerStudio.openPdfBeside",
+					"when": "resourceExtname == .pdf",
+					"group": "navigation@9"
+				}
+			],
+			"editor/context": [
+				{
+					"command": "writerStudio.straighten",
+					"when": "editorLangId == markdown",
+					"group": "0_vswriter@1"
+				},
+				{
+					"command": "writerStudio.nudge",
+					"when": "editorLangId == markdown",
+					"group": "0_vswriter@2"
+				}
+			],
+			"editor/title": [
+				{
+					"command": "writerStudio.straighten",
+					"when": "editorLangId == markdown",
+					"group": "navigation@0"
+				}
+			],
+			"comments/commentThread/context": [
+				{
+					"command": "writerStudio.nudge.reply",
+					"group": "inline",
+					"when": "commentController == writerStudio.nudge"
+				}
+			],
+			"comments/commentThread/title": [
+				{
+					"command": "writerStudio.nudge.dismiss",
+					"group": "inline",
+					"when": "commentController == writerStudio.nudge"
+				}
+			]
+		},
+		"configurationDefaults": {
+			"workbench.editorAssociations": {
+				"**/readings/*.md": "vscode.markdown.preview.editor",
+				"**/sources/*.md": "vscode.markdown.preview.editor"
+			},
+			"comments.openView": "never"
+		},
+		"markdown.previewStyles": [
+			"./media/reading-preview.css"
+		]
+	},
+	"scripts": {
+		"build": "bun build src/extension.ts --outfile dist/extension.js --target node --format cjs --external vscode",
+		"test": "bun test",
+		"typecheck": "bun ../../vscode/node_modules/typescript/bin/tsc6 -p tsconfig.json"
+	},
+	"capabilities": {
+		"untrustedWorkspaces": {
+			"supported": true
+		},
+		"virtualWorkspaces": false
+	}
+}

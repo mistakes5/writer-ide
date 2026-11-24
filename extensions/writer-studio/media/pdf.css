@@ -1,0 +1,872 @@
+/*
+ * VSwriter PDF reader.
+ *
+ * A printed reading beside the draft: a toolbar, the pages, and a drawer of the
+ * writer's bookmarks and highlights. Chrome colours come from the host theme
+ * through --vscode-* variables, as in panel.css. The rules are in
+ * ../UI-ANTI-SLOP.md, with two exceptions that belong to this file and are
+ * recorded there:
+ *
+ *   1. The colour literals in the first :root block: the white of a printed
+ *      sheet, and the three highlighter inks with the line colour of each.
+ *      A highlight has to keep its colour whatever theme is active, because
+ *      the colour is what the writer chose it by.
+ *   2. The one transform in the text-layer block. PDF.js places each run of
+ *      selectable text over the painted page with it. Nothing moves.
+ */
+
+:root {
+	--paper: white;
+	--ink-ochre: rgba(201, 152, 46, 0.38);
+	--ink-sage: rgba(111, 138, 92, 0.38);
+	--ink-brick: rgba(168, 74, 49, 0.3);
+	--ink-ochre-line: rgb(150, 108, 22);
+	--ink-sage-line: rgb(84, 110, 68);
+	--ink-brick-line: rgb(154, 74, 49);
+}
+
+:root {
+	--w-serif: "Iowan Old Style", Charter, Georgia, serif;
+	--w-sans: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+	--w-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+	/* The desk is what the sheets lie on. The toolbar and the drawer are
+	   written on the editor's own page colour. */
+	--w-desk: var(--vscode-sideBar-background, var(--vscode-editor-background));
+	--w-page: var(--vscode-editor-background);
+	--w-ink: var(--vscode-editor-foreground, var(--vscode-foreground));
+	--w-soft: var(--vscode-descriptionForeground, var(--vscode-foreground));
+	--w-link: var(--vscode-textLink-foreground);
+	--w-focus: var(--vscode-focusBorder);
+
+	--w-rule: var(--vscode-editorGroup-border, var(--vscode-panel-border));
+	--w-rule-strong: color-mix(in srgb, var(--w-ink) 30%, transparent);
+	--w-wash: var(--vscode-list-hoverBackground, color-mix(in srgb, var(--w-ink) 7%, transparent));
+
+	--w-gutter: 14px;
+}
+
+body.vscode-high-contrast,
+body.vscode-high-contrast-light {
+	--w-rule: var(--vscode-contrastBorder);
+	--w-rule-strong: var(--vscode-contrastBorder);
+	--w-soft: var(--vscode-foreground);
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	overflow: hidden;
+	background: var(--w-page);
+	color: var(--w-ink);
+	font-family: var(--w-sans);
+	font-size: 13px;
+	line-height: 1.4;
+	overflow-wrap: break-word;
+}
+
+::selection {
+	background: var(--vscode-editor-selectionBackground);
+}
+
+h2,
+p,
+ol {
+	margin: 0;
+	padding: 0;
+}
+
+ol {
+	list-style: none;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.mono {
+	font-family: var(--w-mono);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+/* Verbatim reading text. */
+.prose {
+	font-family: var(--w-serif);
+	font-size: 14.5px;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+
+/* Controls ------------------------------------------------------------ */
+
+.btn {
+	appearance: none;
+	flex: none;
+	margin: 0;
+	padding: 3px 8px;
+	border: 1px solid var(--w-rule-strong);
+	border-radius: 2px;
+	background: transparent;
+	color: var(--w-ink);
+	font: inherit;
+	font-size: 12px;
+	line-height: 16px;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.btn:hover {
+	background: var(--w-wash);
+}
+
+.btn:active {
+	background: var(--vscode-list-activeSelectionBackground, var(--w-wash));
+	color: var(--vscode-list-activeSelectionForeground, var(--w-ink));
+}
+
+/* A switch that is on: Fit width while it governs the zoom, Bookmarked on a
+   bookmarked page, Notes while the drawer is open. The word changes with the
+   state where there is a word for it, so the fill never carries it alone. */
+.btn[aria-pressed="true"],
+.btn[aria-expanded="true"] {
+	border-color: var(--w-ink);
+	background: var(--vscode-list-inactiveSelectionBackground, var(--w-wash));
+}
+
+.btn:disabled,
+.btn-text:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.btn:disabled:hover {
+	background: transparent;
+}
+
+/* The minus and plus of the zoom control. */
+.btn-glyph {
+	width: 24px;
+	padding-left: 0;
+	padding-right: 0;
+	font-size: 13px;
+	text-align: center;
+}
+
+.btn-text {
+	appearance: none;
+	flex: none;
+	margin: 0;
+	padding: 1px 2px;
+	border: 0;
+	border-radius: 2px;
+	background: none;
+	color: var(--w-link);
+	font: inherit;
+	font-size: 12px;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.btn-text:hover {
+	color: var(--vscode-textLink-activeForeground, var(--w-link));
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible {
+	outline: 1px solid var(--w-focus);
+	outline-offset: 2px;
+}
+
+.field {
+	min-width: 0;
+	margin: 0;
+	padding: 3px 6px;
+	border: 1px solid var(--vscode-input-border, var(--w-rule-strong));
+	border-radius: 2px;
+	background: var(--vscode-input-background, var(--w-page));
+	color: var(--vscode-input-foreground, var(--w-ink));
+	font: inherit;
+	font-size: 13px;
+	line-height: 16px;
+}
+
+.field::placeholder {
+	color: var(--vscode-input-placeholderForeground, var(--w-soft));
+}
+
+.field:focus {
+	outline: 1px solid var(--w-focus);
+	outline-offset: -1px;
+	border-color: var(--w-focus);
+}
+
+.field:disabled {
+	opacity: 0.5;
+}
+
+.field.mono {
+	font-family: var(--w-mono);
+	font-size: 11px;
+}
+
+.readout {
+	flex: none;
+	color: var(--w-soft);
+	white-space: nowrap;
+}
+
+
+/* Toolbar ------------------------------------------------------------- */
+
+.bar {
+	flex: none;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 16px;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--w-rule);
+}
+
+.bar-line {
+	display: flex;
+	align-items: center;
+	gap: 6px 16px;
+	min-width: 0;
+}
+
+.bar-line-grow {
+	flex: 1 1 380px;
+}
+
+.group {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	min-width: 0;
+}
+
+.page-field {
+	width: 5ch;
+	padding-left: 4px;
+	padding-right: 4px;
+	text-align: right;
+}
+
+#page-count {
+	margin: 0 4px 0 2px;
+}
+
+/* Wide enough for "400%", so the buttons beside it stay where they are. */
+.zoom-readout {
+	min-width: 4ch;
+	text-align: right;
+	margin: 0 2px;
+}
+
+.group-find {
+	flex: 1 1 auto;
+}
+
+.find-field {
+	flex: 1 1 80px;
+	width: 80px;
+	max-width: 260px;
+}
+
+.find-tally {
+	margin: 0 2px;
+}
+
+.find-tally:empty {
+	display: none;
+}
+
+.group-keep {
+	flex: none;
+	margin-left: auto;
+}
+
+
+/* Selection bar ------------------------------------------------------- */
+
+.selbar {
+	flex: none;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 16px;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--w-rule);
+}
+
+.selbar-text {
+	flex: 1 1 220px;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.selbar-page {
+	margin-right: 10px;
+	color: var(--w-soft);
+}
+
+.selbar-quote {
+	font-size: 14px;
+}
+
+.selbar-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px 16px;
+}
+
+.selbar-status {
+	align-self: center;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+.selbar-status:empty {
+	display: none;
+}
+
+/* A square of the ink beside its name. */
+.swatch {
+	display: inline-block;
+	width: 9px;
+	height: 9px;
+	margin-right: 6px;
+	border: 1px solid;
+}
+
+.ink-ochre {
+	background: var(--ink-ochre);
+	border-color: var(--ink-ochre-line);
+}
+
+.ink-sage {
+	background: var(--ink-sage);
+	border-color: var(--ink-sage-line);
+}
+
+.ink-brick {
+	background: var(--ink-brick);
+	border-color: var(--ink-brick-line);
+}
+
+
+/* Pages --------------------------------------------------------------- */
+
+.work {
+	flex: 1 1 auto;
+	display: flex;
+	min-height: 0;
+}
+
+/* Positioned, so a sheet's offsetTop is its place in the scrolled column. */
+.viewer {
+	position: relative;
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: auto;
+	padding: var(--w-gutter);
+	background: var(--w-desk);
+	/* Only the runs of text on a sheet can be selected. A drag that leaves
+	   the text for the margin or the desk then keeps what it had, where it
+	   would otherwise take in the sheet from its first line. */
+	user-select: none;
+}
+
+.viewer:focus {
+	outline: none;
+}
+
+.notice {
+	max-width: 36em;
+	margin: 26px auto 0;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+.notice.is-error {
+	color: var(--vscode-errorForeground, var(--w-ink));
+}
+
+/* Sheets in one column, centred while they fit and scrolled sideways inside
+   the viewer once the zoom makes them wider than the pane. */
+.pages {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 12px;
+	width: max-content;
+	min-width: 100%;
+}
+
+/* One sheet. pdf.js gives it a width and a height in CSS pixels and the
+   --total-scale-factor the PDF.js text layer sizes itself by. */
+.page {
+	--scale-round-x: 1px;
+	--scale-round-y: 1px;
+	position: relative;
+	box-sizing: content-box;
+	flex: none;
+	border: 1px solid var(--w-rule);
+	background: var(--paper);
+	overflow: clip;
+}
+
+.sheet,
+.marks {
+	position: absolute;
+	inset: 0;
+}
+
+.sheet canvas {
+	display: block;
+	width: 100%;
+	height: 100%;
+}
+
+/* Saved highlights: flat rectangles of ink under the selectable text. */
+.marks {
+	pointer-events: none;
+}
+
+.mark {
+	position: absolute;
+}
+
+.mark.is-current {
+	outline: 1px solid var(--w-focus);
+}
+
+.page.over-mark .textLayer :is(span, br) {
+	cursor: pointer;
+}
+
+/*
+ * The PDF.js text layer: transparent, selectable runs of text placed over the
+ * painted page. The geometry here follows pdf_viewer.css in pdfjs-dist 6.5,
+ * which TextLayer expects. It sets left, top, --font-height, --scale-x and
+ * --rotate on each run through the DOM, and this block turns them into a size
+ * and a position.
+ */
+.textLayer {
+	--min-font-size: 1;
+	--text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+	--min-font-size-inv: calc(1 / var(--min-font-size));
+	position: absolute;
+	inset: 0;
+	overflow: clip;
+	line-height: 1;
+	text-align: initial;
+	text-size-adjust: none;
+	forced-color-adjust: none;
+	caret-color: CanvasText;
+	z-index: 0;
+}
+
+.textLayer :is(span, br) {
+	position: absolute;
+	color: transparent;
+	white-space: pre;
+	cursor: text;
+	user-select: text;
+	transform-origin: 0% 0%;
+}
+
+.textLayer > :not(.markedContent),
+.textLayer .markedContent span:not(.markedContent) {
+	--font-height: 0;
+	--scale-x: 1;
+	--rotate: 0deg;
+	z-index: 1;
+	font-size: calc(var(--text-scale-factor) * var(--font-height));
+	transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+}
+
+.textLayer .markedContent {
+	display: contents;
+}
+
+/* A page the PDF stores turned on its side. PDF.js lays its text out
+   unturned and names the turn; these put it back over the painted sheet. */
+.textLayer {
+	transform-origin: 0 0;
+}
+
+.textLayer[data-main-rotation="90"] {
+	transform: rotate(90deg) translateY(-100%);
+}
+
+.textLayer[data-main-rotation="180"] {
+	transform: rotate(180deg) translate(-100%, -100%);
+}
+
+.textLayer[data-main-rotation="270"] {
+	transform: rotate(270deg) translateX(-100%);
+}
+
+/* The sheet is paper whatever the theme, so text selected on it takes the
+   system's selection colour and not the editor's. */
+.textLayer ::selection {
+	background: color-mix(in srgb, Highlight 45%, transparent);
+	color: transparent;
+}
+
+.textLayer br::selection {
+	background: transparent;
+}
+
+/* Keeps a drag that leaves the text from selecting the whole sheet. pdf.js
+   moves this element while a selection is being made, as the PDF.js viewer does. */
+.textLayer .endOfContent {
+	display: block;
+	position: absolute;
+	inset: 100% 0 0;
+	z-index: 0;
+	cursor: default;
+	user-select: none;
+}
+
+.textLayer.selecting .endOfContent {
+	top: 0;
+}
+
+/* Find. Every match gets the system's mark colour; the one the tally counts
+   from is stronger and underlined, so it does not rest on colour alone. */
+::highlight(vsw-find) {
+	background-color: color-mix(in srgb, Mark 45%, transparent);
+	color: transparent;
+}
+
+::highlight(vsw-find-current) {
+	background-color: color-mix(in srgb, Mark 90%, transparent);
+	color: transparent;
+	text-decoration: underline 2px var(--w-focus);
+}
+
+
+/* Drawer -------------------------------------------------------------- */
+
+.drawer {
+	flex: 0 0 300px;
+	min-width: 0;
+	overflow-y: auto;
+	padding: 12px var(--w-gutter) 28px;
+	border-left: 1px solid var(--w-rule);
+}
+
+.section {
+	margin-top: 22px;
+	padding-top: 12px;
+	border-top: 1px solid var(--w-rule);
+}
+
+.section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.section-head h2 {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.tally {
+	color: var(--w-soft);
+	white-space: nowrap;
+}
+
+.empty {
+	max-width: 36em;
+	margin-top: 10px;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+.rows {
+	margin-top: 4px;
+}
+
+.rows > li {
+	border-top: 1px solid var(--w-rule);
+}
+
+.rows > li:first-child {
+	border-top: 0;
+}
+
+/* The part of a row that goes to its place in the PDF. */
+.row-go {
+	appearance: none;
+	display: block;
+	width: calc(100% + 12px);
+	margin: 0 -6px;
+	padding: 5px 6px;
+	border: 0;
+	border-radius: 2px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.row-go:hover {
+	background: var(--w-wash);
+}
+
+.row-go:active {
+	background: var(--vscode-list-activeSelectionBackground, var(--w-wash));
+	color: var(--vscode-list-activeSelectionForeground, var(--w-ink));
+}
+
+.row-go:focus-visible {
+	outline: 1px solid var(--w-focus);
+	outline-offset: -1px;
+}
+
+.locator {
+	color: var(--w-soft);
+}
+
+/* Bookmark: page, label, Remove on one line. */
+.bm {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+	padding: 3px 0;
+}
+
+.bm .row-go {
+	flex: 1 1 auto;
+	display: flex;
+	align-items: baseline;
+	gap: 10px;
+	width: auto;
+	min-width: 0;
+	margin-right: 0;
+}
+
+.bm .locator {
+	flex: none;
+}
+
+.bm-label {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/* Highlight: page and ink, the passage, the writer's note, two actions. */
+.hl {
+	padding: 7px 0 10px;
+}
+
+.hl.is-current .row-go {
+	background: var(--vscode-list-inactiveSelectionBackground, var(--w-wash));
+}
+
+.hl-head {
+	display: flex;
+	gap: 10px;
+	align-items: baseline;
+}
+
+.ink-name {
+	font-size: 11px;
+	color: var(--w-soft);
+}
+
+.excerpt {
+	display: block;
+	margin-top: 3px;
+}
+
+/* The passage carries its ink here as it does on the sheet. */
+.excerpt mark {
+	color: inherit;
+	border: 0;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+.note-field {
+	display: block;
+	width: 100%;
+	min-height: 24px;
+	max-height: 12em;
+	margin-top: 6px;
+	font-size: 12px;
+	line-height: 16px;
+	resize: none;
+	field-sizing: content;
+}
+
+.row-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 4px 14px;
+	margin-top: 6px;
+}
+
+.row-actions .ask {
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+
+/* Width rules --------------------------------------------------------- */
+
+/*
+ * The toolbar gives up space in a fixed order as the pane narrows. Measured
+ * in headless Chromium with the system UI face, a three-digit page count and
+ * a two-digit note count:
+ *
+ *   900px and wider   one row, every label in full
+ *   520 to 899px      two rows: page and zoom, then find, bookmark and notes
+ *   380 to 519px      two rows, short labels ("Fit", "Bookmark", "Prev", "Next");
+ *                     each control keeps its full name for assistive technology
+ *   under 380px       the groups wrap again and nothing scrolls sideways
+ *
+ * Under 640px the drawer moves below the pages, where a 300px column would
+ * leave the sheet too little room.
+ */
+
+@media (max-width: 639px) {
+	.work {
+		flex-direction: column;
+	}
+
+	.drawer {
+		flex: 0 0 44%;
+		border-left: 0;
+		border-top: 1px solid var(--w-rule);
+	}
+}
+
+@media (max-width: 519px) {
+	.wide {
+		display: none;
+	}
+
+	.bar,
+	.bar-line,
+	.selbar,
+	.selbar-actions {
+		column-gap: 10px;
+	}
+}
+
+@media (max-width: 379px) {
+	.bar-line,
+	.group-find {
+		flex-wrap: wrap;
+	}
+
+	.bar,
+	.selbar,
+	.viewer {
+		padding-left: 8px;
+		padding-right: 8px;
+	}
+}
+
+/* Companion suggestions: the passage, a one-line reason, and its stance. */
+.suggest {
+	margin-bottom: 22px;
+	padding-bottom: 12px;
+	border-bottom: 1px solid var(--w-rule);
+}
+
+.stance {
+	font-size: 11px;
+	letter-spacing: 0.02em;
+}
+
+.stance-supports {
+	color: var(--vscode-charts-green, var(--w-soft));
+}
+
+.stance-complicates {
+	color: var(--vscode-charts-orange, var(--w-soft));
+}
+
+.suggestion .why {
+	display: block;
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+/* Suggested quotes: readable text on a soft wash, not the page highlight yellow. */
+.suggestion .excerpt mark {
+	background: color-mix(in srgb, var(--vscode-editor-findMatchHighlightBackground, #ffd33d) 35%, transparent);
+	color: var(--vscode-editor-foreground);
+	padding: 1px 2px;
+	border-radius: 2px;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+/* Passages suggested for the paragraph being written. */
+::highlight(vsw-suggest) {
+	background-color: color-mix(in srgb, var(--vscode-charts-green, #3fb950) 22%, transparent);
+	color: transparent;
+}
+
+::highlight(vsw-suggest-current) {
+	background-color: color-mix(in srgb, var(--vscode-charts-green, #3fb950) 45%, transparent);
+	color: transparent;
+	text-decoration: underline 2px var(--vscode-charts-green, #3fb950);
+}
+
+.suggestion.is-current {
+	box-shadow: inset 2px 0 0 var(--vscode-charts-green, #3fb950);
+}
+
+.suggestion {
+	transition: box-shadow 160ms ease;
+}
+
+/* Fit: the frame is trimmed to the ink and the whole sheet slides inside it. */
+.page.cropped > :is(.sheet, .marks, .textLayer) {
+	inset: auto;
+	left: calc(-1 * var(--crop-x));
+	top: calc(-1 * var(--crop-y));
+	width: var(--full-w);
+	height: var(--full-h);
+}

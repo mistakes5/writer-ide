@@ -1,0 +1,1110 @@
+/*
+ * VSwriter sidebar panel.
+ *
+ * Every colour comes from the host theme through --vscode-* variables, so the
+ * panel follows VSwriter Paper, VSwriter Ink and any other theme the writer picks.
+ * This file holds no colour literals, gradients, shadows, transforms or motion.
+ * The rules behind those choices are in ../UI-ANTI-SLOP.md.
+ */
+
+:root {
+	/* Type: serif for the writer's words and the readings, the host UI face for
+	   controls, monospace for locators (pages, lines, files, timestamps). */
+	--w-serif: "Iowan Old Style", Charter, Georgia, serif;
+	--w-sans: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+	--w-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+	/* Surfaces: the sidebar is the desk, the editor background is the page. */
+	--w-desk: var(--vscode-sideBar-background, var(--vscode-editor-background));
+	--w-page: var(--vscode-editor-background);
+	--w-ink: var(--vscode-sideBar-foreground, var(--vscode-foreground));
+	--w-page-ink: var(--vscode-editor-foreground, var(--vscode-foreground));
+	--w-soft: var(--vscode-descriptionForeground, var(--vscode-foreground));
+	--w-link: var(--vscode-textLink-foreground);
+	--w-focus: var(--vscode-focusBorder);
+
+	/* Hairlines. The stronger one is mixed from the ink so it stays in key with
+	   whatever theme is active. */
+	--w-rule: var(--vscode-sideBarSectionHeader-border, var(--vscode-panel-border));
+	--w-rule-strong: color-mix(in srgb, var(--w-ink) 30%, transparent);
+	--w-wash: var(--vscode-list-hoverBackground, color-mix(in srgb, var(--w-ink) 7%, transparent));
+
+	--w-gutter: 14px;
+}
+
+body.vscode-high-contrast,
+body.vscode-high-contrast-light {
+	--w-rule: var(--vscode-contrastBorder);
+	--w-rule-strong: var(--vscode-contrastBorder);
+	--w-soft: var(--vscode-foreground);
+}
+
+*,
+*::before,
+*::after {
+	box-sizing: border-box;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	background: var(--w-desk);
+	color: var(--w-ink);
+	font-family: var(--w-sans);
+	font-size: 13px;
+	line-height: 1.4;
+	/* Workspace text can hold a path or a token wider than the sidebar. It
+	   breaks inside the word before it can push the panel sideways. */
+	overflow-wrap: break-word;
+}
+
+::selection {
+	background: var(--vscode-editor-selectionBackground);
+}
+
+h2,
+h3,
+p,
+ol,
+ul,
+dl,
+dd,
+blockquote {
+	margin: 0;
+	padding: 0;
+}
+
+ol,
+ul {
+	list-style: none;
+}
+
+.visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
+}
+
+.mono {
+	font-family: var(--w-mono);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+}
+
+/* The serif voice: the question, the setup title, the cue heading. */
+.voice {
+	font-family: var(--w-serif);
+	font-size: 16px;
+	font-weight: 400;
+	line-height: 1.4;
+	text-wrap: pretty;
+}
+
+/* The writer's own words and verbatim reading text. */
+.prose {
+	font-family: var(--w-serif);
+	font-size: 14.5px;
+	line-height: 1.55;
+	overflow-wrap: anywhere;
+}
+
+.note,
+.empty {
+	font-size: 12px;
+	color: var(--w-soft);
+	max-width: 36em;
+}
+
+.note {
+	margin-top: 8px;
+}
+
+.empty {
+	margin-top: 10px;
+}
+
+
+/* Tabs ---------------------------------------------------------------- */
+
+/* Four tabs on one line. The bar gives up space in a fixed order as the
+   sidebar narrows (see the width rules at the end of this file) and wraps to a
+   second line only as a last resort, so it never scrolls sideways. */
+.tabs {
+	flex: none;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 8px;
+	padding: 0 calc(var(--w-gutter) - 3px);
+	border-bottom: 1px solid var(--w-rule);
+}
+
+.tab {
+	appearance: none;
+	margin: 0 0 -1px;
+	padding: 9px 3px 8px;
+	border: 0;
+	border-bottom: 1px solid transparent;
+	background: none;
+	color: var(--w-soft);
+	font: inherit;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.tab:hover {
+	color: var(--w-ink);
+}
+
+.tab[aria-selected="true"] {
+	color: var(--w-ink);
+	border-bottom-color: var(--vscode-panelTitle-activeBorder, var(--w-ink));
+}
+
+.tab:focus-visible {
+	outline: 1px solid var(--w-focus);
+	outline-offset: -2px;
+}
+
+.tab-count {
+	margin-left: 5px;
+	font-family: var(--w-mono);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	color: var(--w-soft);
+}
+
+.tab-count:empty {
+	display: none;
+}
+
+/* "Coax & Lint" is the tab's full name. Its first words are the first thing
+   the bar gives up; the title attribute keeps the whole name. */
+.tab-wide {
+	white-space: pre;
+}
+
+
+/* Scrolling body ------------------------------------------------------ */
+
+main {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 14px var(--w-gutter) 28px;
+}
+
+.panel:focus {
+	outline: none;
+}
+
+.section {
+	margin-top: 22px;
+	padding-top: 12px;
+	border-top: 1px solid var(--w-rule);
+}
+
+.section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.section-head h2 {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.tally {
+	color: var(--w-soft);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* Lists divided by hairlines. No boxes around the items. */
+.rows > li {
+	padding: 12px 0;
+	border-top: 1px solid var(--w-rule);
+}
+
+.rows > li:first-child {
+	border-top: 0;
+}
+
+.section .rows > li:first-child {
+	padding-top: 10px;
+}
+
+
+/* Buttons ------------------------------------------------------------- */
+
+.btn {
+	appearance: none;
+	margin: 0;
+	padding: 4px 10px;
+	border: 1px solid var(--w-rule-strong);
+	border-radius: 2px;
+	background: transparent;
+	color: var(--w-ink);
+	font: inherit;
+	font-size: 12px;
+	line-height: 16px;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.btn:hover {
+	background: var(--w-wash);
+}
+
+.btn:active {
+	background: var(--vscode-list-activeSelectionBackground, var(--w-wash));
+	color: var(--vscode-list-activeSelectionForeground, var(--w-ink));
+}
+
+.btn-primary {
+	border-color: var(--vscode-button-border, var(--vscode-button-background));
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+}
+
+.btn-primary:hover,
+.btn-primary:active {
+	background: var(--vscode-button-hoverBackground, var(--vscode-button-background));
+	color: var(--vscode-button-foreground);
+}
+
+.btn:disabled,
+.btn-text:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.btn:disabled:hover {
+	background: transparent;
+}
+
+.btn-primary:disabled:hover {
+	background: var(--vscode-button-background);
+}
+
+/* A plain text action, for the quiet secondary things. */
+.btn-text {
+	appearance: none;
+	margin: 0;
+	padding: 1px 2px;
+	border: 0;
+	border-radius: 2px;
+	background: none;
+	color: var(--w-link);
+	font: inherit;
+	font-size: 12px;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.btn-text:hover {
+	color: var(--vscode-textLink-activeForeground, var(--w-link));
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.btn:focus-visible,
+.btn-text:focus-visible {
+	outline: 1px solid var(--w-focus);
+	outline-offset: 2px;
+}
+
+
+/* Setup --------------------------------------------------------------- */
+
+.setup {
+	padding-bottom: 6px;
+}
+
+.files {
+	margin: 14px 0 16px;
+	padding: 2px 0 2px 12px;
+	border-left: 1px solid var(--w-rule-strong);
+}
+
+.files dt {
+	font-family: var(--w-mono);
+	font-size: 11.5px;
+}
+
+.files dd {
+	margin: 1px 0 9px;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+.files dd:last-child {
+	margin-bottom: 0;
+}
+
+
+/* Interview ----------------------------------------------------------- */
+
+.question {
+	margin-bottom: 12px;
+}
+
+.question.is-empty {
+	font-family: var(--w-sans);
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+/* Stances: sentence openers for the question. Short ones share a line, a
+   long one takes its own and wraps inside its border. */
+.stances {
+	margin-bottom: 12px;
+}
+
+.stances .note {
+	margin: 0 0 6px;
+}
+
+.stance-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.btn-stance {
+	max-width: 100%;
+	text-align: left;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+/* Reading context: one or two passages between two rules. A strip, with no
+   box around it and no fill behind it. */
+.context {
+	margin-bottom: 12px;
+	padding: 9px 0 11px;
+	border-top: 1px solid var(--w-rule);
+	border-bottom: 1px solid var(--w-rule);
+}
+
+.context h3 {
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.context li {
+	margin-top: 8px;
+}
+
+.context li + li {
+	margin-top: 12px;
+}
+
+.context-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.context-cite {
+	min-width: 0;
+	font-family: var(--w-mono);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	color: var(--w-soft);
+	overflow-wrap: anywhere;
+}
+
+.context .excerpt {
+	margin-top: 4px;
+	font-size: 14px;
+	line-height: 1.45;
+}
+
+.answer-input {
+	display: block;
+	width: 100%;
+	min-height: 7.5em;
+	padding: 10px 12px;
+	border: 1px solid var(--vscode-input-border, var(--w-rule-strong));
+	border-radius: 2px;
+	background: var(--w-page);
+	color: var(--w-page-ink);
+	font-size: 15px;
+	line-height: 1.6;
+	resize: vertical;
+}
+
+.answer-input::placeholder {
+	color: var(--vscode-input-placeholderForeground, var(--w-soft));
+	font-style: italic;
+}
+
+.answer-input:focus {
+	outline: 1px solid var(--w-focus);
+	outline-offset: -1px;
+	border-color: var(--w-focus);
+}
+
+.actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: 10px;
+}
+
+.under {
+	display: flex;
+	align-items: baseline;
+	gap: 12px;
+	margin-top: 8px;
+}
+
+.under .note {
+	margin-top: 0;
+}
+
+.hint {
+	margin-left: auto;
+	font-size: 11px;
+	color: var(--w-soft);
+	white-space: nowrap;
+}
+
+kbd {
+	padding: 0 4px;
+	border: 1px solid var(--w-rule-strong);
+	border-radius: 2px;
+	background: none;
+	box-shadow: none;
+	color: inherit;
+	font-family: var(--w-mono);
+	font-size: 10.5px;
+}
+
+#answer-status:empty {
+	display: none;
+}
+
+.answer-time {
+	display: block;
+	color: var(--w-soft);
+}
+
+.answer-prompt {
+	margin: 3px 0 6px;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+.answer-text {
+	white-space: pre-wrap;
+}
+
+
+/* Outline ------------------------------------------------------------- */
+
+.outline-rows {
+	margin-top: 6px;
+}
+
+.outline-rows > li {
+	padding: 4px 0;
+	border-top: 1px solid var(--w-rule);
+}
+
+.outline-rows > li:first-child {
+	border-top: 0;
+}
+
+/* The section a run of paragraphs sits under, given once above the first.
+   It is the writer's own heading, so it is set in the serif. */
+.outline-heading {
+	margin: 6px 0 2px;
+	font-family: var(--w-serif);
+	font-size: 14.5px;
+	font-weight: 600;
+	line-height: 1.35;
+	overflow-wrap: anywhere;
+}
+
+.outline-row {
+	appearance: none;
+	display: block;
+	width: calc(100% + 12px);
+	margin: 0 -6px;
+	padding: 5px 6px 6px;
+	border: 0;
+	border-radius: 2px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.outline-row:hover {
+	background: var(--w-wash);
+}
+
+.outline-row:active {
+	background: var(--vscode-list-activeSelectionBackground, var(--w-wash));
+	color: var(--vscode-list-activeSelectionForeground, var(--w-ink));
+}
+
+.outline-row:focus-visible {
+	outline: 1px solid var(--w-focus);
+	outline-offset: -1px;
+}
+
+/* Paragraph number and its counts, set apart by space alone. */
+.outline-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 10px;
+	font-family: var(--w-mono);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	color: var(--w-soft);
+}
+
+.outline-index {
+	color: var(--w-ink);
+}
+
+.outline-row:active .outline-meta,
+.outline-row:active .outline-index,
+.outline-row:active .outline-gaps {
+	color: inherit;
+}
+
+.outline-preview {
+	display: block;
+	margin-top: 2px;
+	font-size: 14px;
+	line-height: 1.45;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* What the paragraph still lacks, in words. The warning colour is the theme's. */
+.outline-gaps {
+	display: block;
+	margin-top: 1px;
+	font-size: 12px;
+	color: var(--vscode-editorWarning-foreground);
+	overflow-wrap: anywhere;
+}
+
+/* Skeletons: name and Insert share a line, the description runs the full
+   width under both. Read in order: name, description, Insert. */
+.skeleton {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 5px 12px;
+}
+
+#skeletons > li {
+	padding: 10px 0;
+}
+
+.skeleton-label {
+	grid-column: 1;
+	grid-row: 1;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.skeleton .btn {
+	grid-column: 2;
+	grid-row: 1;
+}
+
+.skeleton-desc {
+	grid-column: 1 / -1;
+	grid-row: 2;
+	font-size: 12px;
+	color: var(--w-soft);
+	overflow-wrap: anywhere;
+}
+
+
+/* Bookmarks ----------------------------------------------------------- */
+
+.cite {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 0 6px;
+	margin-bottom: 8px;
+}
+
+.cite-author {
+	min-width: 0;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.cite-locator {
+	font-family: var(--w-mono);
+	font-size: 11.5px;
+	font-variant-numeric: tabular-nums;
+}
+
+.excerpt {
+	padding: 1px 0 1px 12px;
+	border-left: 1px solid var(--w-soft);
+	background: none;
+	color: var(--w-ink);
+}
+
+.reason {
+	margin: 9px 0 10px;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+.bookmark-foot {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+/* File name and line. The name gives way first so the line number stays. */
+.source-path {
+	display: flex;
+	min-width: 0;
+	color: var(--w-soft);
+	white-space: nowrap;
+}
+
+.source-name {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+
+/* Cues ---------------------------------------------------------------- */
+
+.coax-heading {
+	margin-top: 10px;
+}
+
+.starter {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: start;
+	gap: 12px;
+}
+
+#starters > li {
+	padding: 10px 0;
+}
+
+#starters > li:first-child {
+	border-top: 0;
+}
+
+#coax-note {
+	margin-top: 4px;
+	padding-top: 10px;
+	border-top: 1px solid var(--w-rule);
+}
+
+#coax-empty + #coax-note {
+	border-top: 0;
+	padding-top: 0;
+}
+
+
+/* Flags --------------------------------------------------------------- */
+
+.flag-group {
+	padding: 12px 0 6px;
+	border-top: 1px solid var(--w-rule);
+}
+
+.flag-group:first-child {
+	border-top: 0;
+	padding-top: 10px;
+}
+
+.flag-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 10px;
+}
+
+.flag-head h3 {
+	min-width: 0;
+	font-size: 13px;
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.flag-tally {
+	font-family: var(--w-mono);
+	font-size: 11px;
+	white-space: nowrap;
+}
+
+.sev-error {
+	color: var(--vscode-editorError-foreground, var(--vscode-errorForeground));
+}
+
+.sev-warning {
+	color: var(--vscode-editorWarning-foreground);
+}
+
+.sev-info {
+	color: var(--vscode-editorInfo-foreground, var(--w-soft));
+}
+
+.flag-explain,
+.flag-advice {
+	font-size: 12px;
+	max-width: 36em;
+}
+
+.flag-explain {
+	margin-top: 3px;
+	color: var(--w-soft);
+}
+
+.flag-advice {
+	margin-top: 2px;
+}
+
+.flag-group ul {
+	margin-top: 6px;
+}
+
+.flag {
+	appearance: none;
+	display: grid;
+	grid-template-columns: 30px minmax(0, 1fr);
+	gap: 0 10px;
+	width: calc(100% + 12px);
+	margin: 0 -6px;
+	padding: 5px 6px;
+	border: 0;
+	border-radius: 2px;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+}
+
+.flag:hover {
+	background: var(--w-wash);
+}
+
+.flag:focus-visible {
+	outline: 1px solid var(--w-focus);
+	outline-offset: -1px;
+}
+
+.flag-line {
+	padding-top: 4px;
+	font-family: var(--w-mono);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	text-align: right;
+	color: var(--w-soft);
+}
+
+.flag-excerpt {
+	display: block;
+	font-size: 14px;
+	line-height: 1.45;
+}
+
+.flag-message {
+	display: block;
+	margin-top: 1px;
+	font-size: 12px;
+	color: var(--w-soft);
+}
+
+
+/* Status strip -------------------------------------------------------- */
+
+.status {
+	flex: none;
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 5px var(--w-gutter) 6px;
+	border-top: 1px solid var(--w-rule);
+	font-size: 11px;
+	color: var(--w-soft);
+	white-space: nowrap;
+}
+
+.status-file {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+
+/* Narrow sidebars. The tab bar gives up, in order: the first words of
+   "Coax & Lint", a point of type and some air, then the counts. The widths
+   are measured ones; see the tab bar note in ../UI-ANTI-SLOP.md. */
+@media (max-width: 372px) {
+	.tab-wide {
+		display: none;
+	}
+}
+
+@media (max-width: 326px) {
+	.tabs {
+		gap: 0 4px;
+		padding: 0 8px;
+	}
+
+	.tab {
+		font-size: 12px;
+	}
+}
+
+@media (max-width: 290px) {
+	.tabs {
+		gap: 0 2px;
+	}
+
+	.tab-count {
+		display: none;
+	}
+}
+
+@media (max-width: 250px) {
+
+	.hint {
+		display: none;
+	}
+
+	.starter {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 4px;
+	}
+
+	.starter .btn-text {
+		justify-self: start;
+	}
+}
+
+/* Launcher: everything a writer opens beside the draft, one click each. */
+.launch {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	padding: 10px var(--w-gutter) 8px;
+	border-bottom: 1px solid var(--w-rule);
+}
+
+.launch-btn {
+	appearance: none;
+	margin: 0;
+	padding: 3px 10px;
+	border: 1px solid var(--w-rule-strong);
+	border-radius: 999px;
+	background: transparent;
+	color: var(--w-ink);
+	font: 12px var(--w-sans);
+	cursor: pointer;
+	transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.launch-btn:hover {
+	background: var(--w-wash);
+	border-color: var(--w-ink);
+}
+
+.launch-btn:focus-visible {
+	outline: 1px solid var(--w-focus);
+	outline-offset: 1px;
+}
+
+/* Assistant chat. The assistant speaks in the page's serif, unboxed; the
+   writer's own words sit on a quiet wash to the right. */
+.chat {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+.chat > .brief,
+.chat > .chat-error {
+	flex: none;
+}
+
+.brief {
+	font: 12px/1.45 var(--w-sans);
+	color: var(--w-soft);
+}
+
+.brief summary {
+	cursor: pointer;
+	width: max-content;
+}
+
+.brief ul {
+	margin: 6px 0 2px;
+	padding: 0 0 0 10px;
+	border-left: 2px solid var(--w-rule-strong);
+	list-style: none;
+	max-height: 30vh;
+	overflow-y: auto;
+}
+
+.chat-log {
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	margin: 0;
+	padding: 0 2px 4px 0;
+	list-style: none;
+}
+
+/* On the Assistant tab the conversation scrolls by itself and the composer
+   stays put under it, like any chat. */
+main:has(#panel-interview:not([hidden])) {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+	padding-bottom: 8px;
+}
+
+#panel-interview:not([hidden]) {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+	flex-direction: column;
+}
+
+.chat {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.msg p {
+	margin: 0;
+	white-space: pre-wrap;
+}
+
+.msg-assistant .voice {
+	font-size: 15px;
+	line-height: 1.5;
+}
+
+.msg-writer {
+	align-self: flex-end;
+	max-width: 88%;
+	padding: 7px 10px;
+	border-radius: 10px 10px 2px 10px;
+	background: var(--w-wash);
+}
+
+.msg.is-new {
+	animation: msg-in 220ms ease-out both;
+}
+
+@keyframes msg-in {
+	from { opacity: 0; transform: translateY(4px); }
+}
+
+.is-typing p {
+	display: flex;
+	gap: 4px;
+	height: 18px;
+	align-items: center;
+}
+
+.is-typing span {
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--w-soft);
+	animation: typing 1s infinite ease-in-out;
+}
+
+.is-typing span:nth-child(2) { animation-delay: 0.15s; }
+.is-typing span:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes typing {
+	0%, 80%, 100% { opacity: 0.25; }
+	40% { opacity: 1; }
+}
+
+.chat-error {
+	margin: 0;
+	font: 12px/1.45 var(--w-sans);
+	color: var(--vscode-errorForeground);
+}
+
+.composer {
+	flex: none;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	padding: 8px 0 4px;
+	background: var(--w-desk);
+}
+
+.composer textarea {
+	resize: vertical;
+	min-height: 56px;
+	padding: 6px 8px;
+	border: 1px solid var(--vscode-input-border, var(--w-rule-strong));
+	border-radius: 4px;
+	background: var(--vscode-input-background);
+	color: var(--vscode-input-foreground);
+}
+
+.composer textarea:focus {
+	outline: 1px solid var(--w-focus);
+	outline-offset: -1px;
+}
+
+.composer .btn {
+	align-self: flex-end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.msg.is-new, .is-typing span { animation: none; }
+}
+
+.chat-tools {
+	flex: none;
+	display: flex;
+	justify-content: flex-end;
+}

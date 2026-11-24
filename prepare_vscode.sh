@@ -123,6 +123,12 @@ fi
 
 setpath_json "product" "tunnelApplicationConfig" '{}'
 
+# writer-ide branding overrides
+if [[ -f ../writer-product.json ]]; then
+  jsonTmp=$( jq -s '.[0] * .[1] | .builtInExtensions = .[1].builtInExtensions' product.json ../writer-product.json )
+  echo "${jsonTmp}" > product.json && unset jsonTmp
+fi
+
 jsonTmp=$( jq -s '.[0] * .[1]' product.json ../product.json )
 echo "${jsonTmp}" > product.json && unset jsonTmp
 

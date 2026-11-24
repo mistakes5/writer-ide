@@ -1,0 +1,19 @@
+{
+	"compilerOptions": {
+		"target": "ES2022",
+		"module": "node16",
+		"moduleResolution": "node16",
+		"lib": ["ES2022"],
+		"strict": true,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"types": [],
+		"typeRoots": []
+	},
+	"files": [
+		"../../vscode/src/vscode-dts/vscode.d.ts",
+		"../../vscode/node_modules/@types/node/index.d.ts"
+	],
+	"include": ["src/**/*.ts"]
+}

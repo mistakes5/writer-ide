@@ -1,0 +1,5 @@
+src/**
+tests/**
+.agent-logs/**
+tsconfig.json
+**/*.map

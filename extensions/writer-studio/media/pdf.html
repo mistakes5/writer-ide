@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src {{CSP_SOURCE}}; script-src 'nonce-{{NONCE}}' {{CSP_SOURCE}}; worker-src {{CSP_SOURCE}} blob:; connect-src {{CSP_SOURCE}}; img-src {{CSP_SOURCE}} data: blob:; font-src {{CSP_SOURCE}} data:;">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!-- Read by pdf.js, which imports the library and names the worker. No inline script. -->
+	<meta name="vswriter-pdf-js" content="{{PDF_JS_URI}}">
+	<meta name="vswriter-pdf-worker" content="{{PDF_WORKER_URI}}">
+	<title>VSwriter PDF Reader</title>
+	<link rel="stylesheet" href="{{PDF_CSS_URI}}">
+</head>
+<body>
+
+	<!-- One row when the pane is wide. In a narrow split pane the second group
+	     drops under the first; the widths are at the end of pdf.css. -->
+	<header class="bar" role="toolbar" aria-label="PDF reader">
+		<div class="bar-line">
+			<div class="group" role="group" aria-label="Page">
+				<button class="btn" id="page-prev" type="button" aria-label="Previous page" disabled>Prev</button>
+				<label class="visually-hidden" for="page-number">Page</label>
+				<input class="field mono page-field" id="page-number" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" value="" disabled>
+				<span class="mono readout" id="page-count">of 0</span>
+				<button class="btn" id="page-next" type="button" aria-label="Next page" disabled>Next</button>
+			</div>
+			<div class="group" role="group" aria-label="Zoom">
+				<button class="btn btn-glyph" id="zoom-out" type="button" aria-label="Zoom out" disabled>&minus;</button>
+				<span class="mono readout zoom-readout" id="zoom-level" aria-live="off">100%</span>
+				<button class="btn btn-glyph" id="zoom-in" type="button" aria-label="Zoom in" disabled>+</button>
+				<button class="btn" id="zoom-fit" type="button" aria-pressed="true" aria-label="Fit width" disabled>Fit<span class="wide"> width</span></button>
+			</div>
+		</div>
+		<div class="bar-line bar-line-grow">
+			<div class="group group-find" role="search" aria-label="Find in this PDF">
+				<label class="visually-hidden" for="find-input">Find in this PDF</label>
+				<input class="field find-field" id="find-input" type="text" autocomplete="off" spellcheck="false" placeholder="Find in PDF" disabled>
+				<span class="mono readout find-tally" id="find-tally" role="status" aria-live="polite"></span>
+				<button class="btn" id="find-prev" type="button" aria-label="Previous match" disabled>Prev<span class="wide"> match</span></button>
+				<button class="btn" id="find-next" type="button" aria-label="Next match" disabled>Next<span class="wide"> match</span></button>
+			</div>
+			<div class="group group-keep">
+				<button class="btn" id="bookmark-toggle" type="button" aria-pressed="false" disabled><span id="bookmark-word">Bookmark</span><span class="wide" id="bookmark-rest"> page</span></button>
+				<button class="btn" id="drawer-toggle" type="button" aria-expanded="false" aria-controls="drawer">Notes</button>
+			</div>
+		</div>
+	</header>
+
+	<!-- Appears under the toolbar while text on a page is selected. It is part
+	     of the layout, so it cannot clip off the edge of a narrow pane. -->
+	<section class="selbar" id="selbar" aria-label="Selected text" hidden>
+		<p class="selbar-text"><span class="mono selbar-page" id="sel-page"></span><span class="prose selbar-quote" id="sel-quote"></span></p>
+		<div class="selbar-actions">
+			<div class="group" role="group" aria-label="Highlight the selection">
+				<button class="btn btn-ink" type="button" data-ink="ochre" aria-label="Highlight in ochre"><span class="swatch ink-ochre" aria-hidden="true"></span>Ochre</button>
+				<button class="btn btn-ink" type="button" data-ink="sage" aria-label="Highlight in sage"><span class="swatch ink-sage" aria-hidden="true"></span>Sage</button>
+				<button class="btn btn-ink" type="button" data-ink="brick" aria-label="Highlight in brick"><span class="swatch ink-brick" aria-hidden="true"></span>Brick</button>
+			</div>
+			<div class="group">
+				<button class="btn" id="sel-quote-draft" type="button">Quote to draft</button>
+				<button class="btn" id="sel-source-map" type="button">Save to source-map</button>
+			</div>
+			<span class="selbar-status" id="sel-status" role="status" aria-live="polite"></span>
+		</div>
+	</section>
+
+	<div class="work">
+
+		<main class="viewer" id="viewer" tabindex="-1" aria-label="PDF pages">
+			<p class="notice" id="notice" role="status" aria-live="polite">Waiting for VSwriter</p>
+			<div class="pages" id="pages"></div>
+		</main>
+
+		<aside class="drawer" id="drawer" aria-label="Notes and bookmarks" hidden>
+			<section class="suggest" id="suggest" aria-labelledby="suggest-title" hidden>
+				<div class="section-head">
+					<h2 id="suggest-title">For your paragraph</h2>
+					<span class="mono tally" id="suggest-tally"></span>
+				</div>
+				<ol class="rows" id="suggestions"></ol>
+			</section>
+
+			<section aria-labelledby="bookmarks-title">
+				<div class="section-head">
+					<h2 id="bookmarks-title">Bookmarks</h2>
+					<span class="mono tally" id="bookmarks-tally"></span>
+				</div>
+				<ol class="rows" id="bookmarks"></ol>
+				<p class="empty" id="bookmarks-empty">No pages bookmarked. Use Bookmark page on a page you want to come back to.</p>
+			</section>
+
+			<section class="section" aria-labelledby="highlights-title">
+				<div class="section-head">
+					<h2 id="highlights-title">Highlights</h2>
+					<span class="mono tally" id="highlights-tally"></span>
+				</div>
+				<ol class="rows" id="highlights"></ol>
+				<p class="empty" id="highlights-empty">Nothing highlighted. Select text on a page, then choose Ochre, Sage or Brick.</p>
+			</section>
+		</aside>
+
+	</div>
+
+	<script type="module" nonce="{{NONCE}}" src="{{PDF_APP_URI}}"></script>
+</body>
+</html>
